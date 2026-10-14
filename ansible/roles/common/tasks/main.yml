@@ -1,0 +1,145 @@
+# ---------- 1. OS preparation ----------
+- name: Turn swap off now
+  ansible.builtin.command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+
+- name: Keep swap off after reboot (comment out swap in fstab)
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+
+- name: Set SELinux to permissive
+  ansible.posix.selinux:
+    policy: targeted
+    state: permissive
+
+- name: Stop and disable firewalld (AWS security groups filter traffic)
+  ansible.builtin.systemd:
+    name: firewalld
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Load kernel modules at boot
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: |
+      overlay
+      br_netfilter
+    mode: "0644"
+
+- name: Load kernel modules now
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+
+- name: Kernel network settings for Kubernetes
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: "1"
+    sysctl_file: /etc/sysctl.d/k8s.conf
+    reload: true
+  loop:
+    - net.bridge.bridge-nf-call-iptables
+    - net.bridge.bridge-nf-call-ip6tables
+    - net.ipv4.ip_forward
+
+# ---------- 2. Container runtime: containerd ----------
+- name: Add the Docker repository (provides containerd.io)
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+    mode: "0644"
+
+- name: Install containerd and helper tools
+  ansible.builtin.dnf:
+    name:
+      - containerd.io
+      - iproute-tc
+    state: present
+
+- name: Create the containerd config directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: "0755"
+
+- name: Check whether the config is a full containerd config (has a version line)
+  ansible.builtin.command: grep -qE '^version = [0-9]+' /etc/containerd/config.toml
+  register: containerd_cfg
+  changed_when: false
+  failed_when: false
+
+- name: Generate the full default config (replaces the package's minimal Docker config with CRI disabled)
+  ansible.builtin.shell: containerd config default > /etc/containerd/config.toml
+  when: containerd_cfg.rc != 0
+  notify: Restart containerd
+
+- name: Check whether the runc options section exists
+  ansible.builtin.command: grep -q "runtimes.runc.options\]" /etc/containerd/config.toml
+  register: runc_opts
+  changed_when: false
+  failed_when: false
+
+- name: Set SystemdCgroup = true inside the existing runc options section
+  ansible.builtin.lineinfile:
+    path: /etc/containerd/config.toml
+    insertafter: 'runtimes\.runc\.options\]'
+    regexp: '^\s*SystemdCgroup\s*='
+    line: '            SystemdCgroup = true'
+  when: runc_opts.rc == 0
+  notify: Restart containerd
+
+- name: Add the runc options section with SystemdCgroup = true if it is missing
+  ansible.builtin.blockinfile:
+    path: /etc/containerd/config.toml
+    marker: "# {mark} ANSIBLE MANAGED: runc systemd cgroup"
+    block: |
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+        SystemdCgroup = true
+  when: runc_opts.rc != 0
+  notify: Restart containerd
+
+- name: Point crictl at containerd (so crictl works without flags)
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: |
+      runtime-endpoint: unix:///run/containerd/containerd.sock
+      image-endpoint: unix:///run/containerd/containerd.sock
+    mode: "0644"
+
+- name: Start and enable containerd
+  ansible.builtin.systemd:
+    name: containerd
+    state: started
+    enabled: true
+
+# ---------- 3. Kubernetes packages ----------
+- name: Add the Kubernetes repository
+  ansible.builtin.yum_repository:
+    name: kubernetes
+    description: Kubernetes
+    baseurl: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/rpm/"
+    gpgcheck: true
+    gpgkey: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_version }}/rpm/repodata/repomd.xml.key"
+    exclude: kubelet kubeadm kubectl cri-tools kubernetes-cni
+
+- name: Install kubelet, kubeadm, kubectl and crictl
+  ansible.builtin.dnf:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+      - cri-tools
+    state: present
+    disable_excludes: kubernetes
+
+- name: Enable kubelet (it waits until kubeadm init/join)
+  ansible.builtin.systemd:
+    name: kubelet
+    enabled: true
+    state: started
