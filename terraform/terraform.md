@@ -36,3 +36,37 @@ DB subnets will use separate ranges inside the VPC, with no overlap.
 - **`count` with a list variable:** one block builds both subnets, each in a different AZ.
 
 **Verification:** `terraform plan` shows 11 resources to add in total.
+
+## Step 5: Security groups
+
+**Built:** a nodes security group and an RDS security group, with a separate rule resource for each rule (`security.tf`).
+
+**Nodes SG: inbound rules**
+| Source | Port | Purpose |
+|---|---|---|
+| `allowed_ssh_cidrs` | TCP 22 | Admin and Ansible SSH |
+| Nodes SG (self) | TCP 6443 | Kubernetes API server |
+| Nodes SG (self) | TCP 2379-2380 | etcd |
+| Nodes SG (self) | TCP 10250 | kubelet |
+| Nodes SG (self) | UDP 8472 | CNI overlay (Flannel VXLAN) |
+| `app_access_cidrs` | TCP 30080 | NGINX NodePort, the only public port |
+
+**RDS SG: inbound rules**
+| Source | Port | Purpose |
+|---|---|---|
+| Nodes SG | TCP 5432 | PostgreSQL from nodes only |
+
+**Decisions**
+- **Separate rule resources:** inline rules conflict and are harder to review.
+- **SSH has no default and rejects `0.0.0.0/0`:** a validation forces an explicit, restricted IP list.
+- **Self-referencing rules:** Kubernetes ports are reachable only from the nodes themselves.
+- **Only port 30080 is public:** not the whole NodePort range.
+- **Explicit egress on nodes:** needed for package installs and image pulls.
+- **No egress on the RDS SG:** security groups are stateful, and the database never initiates connections.
+
+**Known limitation:** the SG allows RDS access from the whole node group, so any pod on a node can reach the database. A NetworkPolicy would restrict this to Flask.
+
+**Operational notes**
+- Real IPs go in `terraform.tfvars` (gitignored), with a safe `terraform.tfvars.example` committed.
+- Whoever runs `apply` must include every teammate's IP, especially the Ansible owner's.
+- The CNI rule must match the plugin Ansible installs.
