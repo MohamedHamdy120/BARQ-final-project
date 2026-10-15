@@ -16,3 +16,30 @@
 - name: Wait until all nodes are Ready
   ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=300s
   changed_when: false
+
+- name: Install git (needed for kubectl apply -k from GitHub)
+  ansible.builtin.dnf:
+    name: git
+    state: present
+
+- name: Install AWS EBS CSI driver
+  ansible.builtin.command: >
+    kubectl apply -k
+    "github.com/kubernetes-sigs/aws-ebs-csi-driver/deploy/kubernetes/overlays/stable/?ref={{ ebs_csi_version }}"
+  register: ebs_apply
+  changed_when: "'created' in ebs_apply.stdout"
+
+- name: Wait for EBS CSI controller
+  ansible.builtin.command: kubectl -n kube-system rollout status deploy/ebs-csi-controller --timeout=300s
+  changed_when: false
+
+- name: Copy gp3 StorageClass manifest
+  ansible.builtin.copy:
+    src: gp3-storageclass.yml
+    dest: /root/gp3-storageclass.yml
+    mode: "0644"
+
+- name: Apply gp3 StorageClass (default)
+  ansible.builtin.command: kubectl apply -f /root/gp3-storageclass.yml
+  register: sc_apply
+  changed_when: "'created' in sc_apply.stdout or 'configured' in sc_apply.stdout"
