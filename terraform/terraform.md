@@ -70,3 +70,28 @@ DB subnets will use separate ranges inside the VPC, with no overlap.
 - Real IPs go in `terraform.tfvars` (gitignored), with a safe `terraform.tfvars.example` committed.
 - Whoever runs `apply` must include every teammate's IP, especially the Ansible owner's.
 - The CNI rule must match the plugin Ansible installs.
+
+## Step 6: EC2 and IAM
+
+**Built:** a key pair, an IAM role with an instance profile, and two EC2 nodes (`ec2.tf`, `iam.tf`).
+
+**Nodes**
+| Node | Role | Disk |
+|---|---|---|
+| barq-control-plane | Kubernetes control plane | 20 GB |
+| barq-worker | Runs NGINX, Flask, Redis | 30 GB |
+
+**Decisions**
+- **`t3.medium`:** kubeadm requires at least 2 vCPU and 2 GB RAM.
+- **AMI found by a `data` lookup (Ubuntu 24.04):** nothing is hardcoded, so it works in any region. `ignore_changes = [ami]` stops a newer image from replacing working nodes.
+- **`for_each` over a map:** one block builds both nodes, with differences visible in one place.
+- **IMDSv2 required:** blocks credential theft through the metadata service.
+- **Encrypted gp3 root volumes:** no extra cost, standard practice.
+- **IAM role has only the SSM policy:** least privilege, and Session Manager is break-glass access if SSH is blocked.
+- **Only the public key goes to Terraform:** the private key never enters Git or state.
+
+**Operational notes**
+- The SSH CIDR list must include every teammate's IP, and the private key is shared through a secure channel, never Git.
+- A validation rejects an empty SSH list.
+
+**Verification:** `terraform plan` shows 27 resources to add in total.
