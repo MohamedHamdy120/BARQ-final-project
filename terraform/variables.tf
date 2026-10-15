@@ -34,9 +34,9 @@ variable "allowed_ssh_cidrs" {
     error_message = "SSH must not be open to the world."
   }
   validation {
-  condition     = length(var.allowed_ssh_cidrs) > 0
-  error_message = "Provide at least one SSH CIDR."
-}
+    condition     = length(var.allowed_ssh_cidrs) > 0
+    error_message = "Provide at least one SSH CIDR."
+  }
 }
 
 variable "node_port" {
@@ -57,4 +57,28 @@ variable "instance_type" {
 variable "public_key_path" {
   type        = string
   description = "Path to the SSH public key, e.g. ~/.ssh/id_ed25519.pub"
+}
+variable "db_name" {
+  type    = string
+  default = "barq"
+}
+
+variable "db_username" {
+  type    = string
+  default = "barq_admin"
+}
+
+variable "db_password" {
+  type      = string
+  sensitive = true
+
+  validation {
+    condition     = length(var.db_password) >= 12
+    error_message = "Use at least 12 characters."
+  }
+}
+
+variable "db_instance_class" {
+  type    = string
+  default = "db.t3.micro"
 }

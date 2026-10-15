@@ -95,3 +95,26 @@ DB subnets will use separate ranges inside the VPC, with no overlap.
 - A validation rejects an empty SSH list.
 
 **Verification:** `terraform plan` shows 27 resources to add in total.
+
+## Step 7: RDS PostgreSQL
+
+**Built:** one PostgreSQL instance in the private DB subnets (`rds.tf`).
+
+**Settings**
+| Setting | Value |
+|---|---|
+| Engine | PostgreSQL 16 |
+| Class | db.t3.micro |
+| Storage | 20 GB gp3, encrypted |
+| Access | Not public, nodes SG only |
+| Multi-AZ | Off (lab) |
+
+**Decisions**
+- **Three access layers:** private subnets, `publicly_accessible = false`, and an SG that allows port 5432 only from the nodes SG.
+- **Password from `TF_VAR_db_password`:** a `sensitive` variable with no default, so it is never committed.
+- **Major version only:** AWS picks a current minor version, so nothing retired is hardcoded.
+- **Lab shortcuts:** `skip_final_snapshot = true` and `deletion_protection = false` so `terraform destroy` works. Production should reverse both.
+
+**Known limitation:** the password is stored in plain text in `terraform.tfstate`, so state stays out of Git. A production setup would use `manage_master_user_password` or a remote encrypted backend.
+
+**Verification:** `terraform plan` shows 28 resources to add in total.
