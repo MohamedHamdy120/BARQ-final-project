@@ -18,3 +18,21 @@ DB subnets will use separate ranges inside the VPC, with no overlap.
 - **`map_public_ip_on_launch`:** EC2 nodes get public IPs for SSH and NodePort access.
 
 **Verification:** `terraform plan` shows 5 resources to add.
+
+## Step 4: DB subnets
+
+**Built:** two private DB subnets in different AZs, a private route table, and a DB subnet group (`network.tf`).
+
+**CIDR plan**
+| Resource | CIDR |
+|---|---|
+| DB subnet 1 | 10.0.11.0/24 |
+| DB subnet 2 | 10.0.12.0/24 |
+
+**Decisions**
+- **Two AZs:** an RDS subnet group requires at least two, and Multi-AZ stays possible later.
+- **Private route table, no internet route:** blocks the internet. Security groups control access from inside the VPC.
+- **No NAT gateway:** RDS needs no outbound internet, and NAT adds cost.
+- **`count` with a list variable:** one block builds both subnets, each in a different AZ.
+
+**Verification:** `terraform plan` shows 11 resources to add in total.
