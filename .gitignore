@@ -1,4 +1,5 @@
-
+outputs.json
+**/outputs.json
 # Ansible
 ansible/inventory/hosts.ini
 *.retry

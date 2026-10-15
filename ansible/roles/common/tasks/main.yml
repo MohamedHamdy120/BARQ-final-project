@@ -21,6 +21,11 @@
     enabled: false
   failed_when: false
 
+- name: Install extra kernel modules for the running kernel (br_netfilter is not in the cloud image)
+  ansible.builtin.dnf:
+    name: "kernel-modules-extra-{{ ansible_kernel }}"
+    state: present
+
 - name: Load kernel modules at boot
   ansible.builtin.copy:
     dest: /etc/modules-load.d/k8s.conf
