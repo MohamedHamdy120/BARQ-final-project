@@ -2,3 +2,7 @@
   hosts: k8s
   roles:
     - common
+- name: Initialise the control plane
+  hosts: control_plane
+  roles:
+    - control_plane

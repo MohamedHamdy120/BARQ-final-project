@@ -1,0 +1,41 @@
+- name: Initialise the control plane (only once)
+  ansible.builtin.command: >
+    kubeadm init
+    --apiserver-advertise-address={{ private_ip }}
+    --pod-network-cidr={{ pod_network_cidr }}
+    --apiserver-cert-extra-sans={{ ansible_host }}
+  args:
+    creates: /etc/kubernetes/admin.conf
+  register: kubeadm_init
+
+- name: Save the kubeadm init output on the node (for troubleshooting)
+  ansible.builtin.copy:
+    content: "{{ kubeadm_init.stdout }}"
+    dest: /root/kubeadm-init.log
+    mode: "0600"
+  when: kubeadm_init is changed
+
+- name: Create the .kube folder for the admin user
+  ansible.builtin.file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+
+- name: Give the admin user a kubeconfig (so kubectl works without sudo)
+  ansible.builtin.copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    remote_src: true
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+
+- name: Wait until the API server answers
+  ansible.builtin.command: kubectl --kubeconfig /etc/kubernetes/admin.conf get --raw /readyz
+  register: api_ready
+  until: api_ready.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false
