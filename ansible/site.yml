@@ -6,3 +6,9 @@
   hosts: control_plane
   roles:
     - control_plane
+- name: Install cluster add-ons
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - addons

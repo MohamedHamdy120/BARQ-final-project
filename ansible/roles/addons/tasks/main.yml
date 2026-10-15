@@ -1,0 +1,18 @@
+- name: Install the Flannel pod network (CNI)
+  ansible.builtin.command: kubectl apply -f {{ flannel_manifest }}
+  register: flannel_apply
+  changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
+
+- name: Wait until Flannel is running on every node
+  ansible.builtin.command: kubectl -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=180s
+  changed_when: false
+
+- name: Allow application pods on the control plane (remove its NoSchedule taint)
+  ansible.builtin.command: kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+  register: untaint
+  changed_when: "'untainted' in untaint.stdout"
+  failed_when: untaint.rc != 0 and 'not found' not in untaint.stderr
+
+- name: Wait until all nodes are Ready
+  ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=180s
+  changed_when: false
