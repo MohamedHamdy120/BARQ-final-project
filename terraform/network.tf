@@ -42,7 +42,7 @@ resource "aws_subnet" "db" {
   cidr_block              = var.db_subnet_cidrs[count.index]
   availability_zone       = data.aws_availability_zones.available.names[count.index]
   map_public_ip_on_launch = false
-  tags = { Name = "${var.project_name}-db-${count.index + 1}" }
+  tags                    = { Name = "${var.project_name}-db-${count.index + 1}" }
 }
 
 resource "aws_route_table" "private" {
