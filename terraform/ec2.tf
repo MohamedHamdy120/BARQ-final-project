@@ -1,9 +1,9 @@
-data "aws_ami" "ubuntu" {
+data "aws_ami" "centos" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["125523088429"] # CentOS Project
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd-gp3/ubuntu-noble-24.04-amd64-server-*"]
+    values = ["CentOS Stream 10 x86_64 *"]
   }
 }
 
@@ -21,7 +21,7 @@ locals {
 
 resource "aws_instance" "node" {
   for_each               = local.nodes
-  ami                    = data.aws_ami.ubuntu.id
+  ami                    = data.aws_ami.centos.id
   instance_type          = var.instance_type
   subnet_id              = aws_subnet.public.id
   vpc_security_group_ids = [aws_security_group.nodes.id]
