@@ -104,7 +104,7 @@ DB subnets will use separate ranges inside the VPC, with no overlap.
 | Setting | Value |
 |---|---|
 | Engine | PostgreSQL 16 |
-| Class | db.t3.micro |
+| Class | m7i-flex.large |
 | Storage | 20 GB gp3, encrypted |
 | Access | Not public, nodes SG only |
 | Multi-AZ | Off (lab) |
