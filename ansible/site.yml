@@ -6,6 +6,12 @@
   hosts: control_plane
   roles:
     - control_plane
+
+- name: Join the worker nodes
+  hosts: workers
+  roles:
+    - worker
+
 - name: Install cluster add-ons
   hosts: control_plane
   environment:

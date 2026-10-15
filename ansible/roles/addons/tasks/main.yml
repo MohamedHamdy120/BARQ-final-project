@@ -4,7 +4,7 @@
   changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
 
 - name: Wait until Flannel is running on every node
-  ansible.builtin.command: kubectl -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=180s
+  ansible.builtin.command: kubectl -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=300s
   changed_when: false
 
 - name: Allow application pods on the control plane (remove its NoSchedule taint)
@@ -14,5 +14,5 @@
   failed_when: untaint.rc != 0 and 'not found' not in untaint.stderr
 
 - name: Wait until all nodes are Ready
-  ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=180s
+  ansible.builtin.command: kubectl wait --for=condition=Ready nodes --all --timeout=300s
   changed_when: false
