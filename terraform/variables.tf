@@ -33,6 +33,10 @@ variable "allowed_ssh_cidrs" {
     condition     = !contains(var.allowed_ssh_cidrs, "0.0.0.0/0")
     error_message = "SSH must not be open to the world."
   }
+  validation {
+  condition     = length(var.allowed_ssh_cidrs) > 0
+  error_message = "Provide at least one SSH CIDR."
+}
 }
 
 variable "node_port" {
@@ -43,4 +47,14 @@ variable "node_port" {
 variable "app_access_cidrs" {
   type    = list(string)
   default = ["0.0.0.0/0"]
+}
+
+variable "instance_type" {
+  type    = string
+  default = "t3.medium"
+}
+
+variable "public_key_path" {
+  type        = string
+  description = "Path to the SSH public key, e.g. ~/.ssh/id_ed25519.pub"
 }

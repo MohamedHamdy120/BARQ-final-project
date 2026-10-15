@@ -1,1 +1,2 @@
 allowed_ssh_cidrs = ["YOUR_PUBLIC_IP/32"]
+public_key_path   = "~/.ssh/id_ed25519.pub"
