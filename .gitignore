@@ -3,3 +3,4 @@ outputs.json
 # Ansible
 ansible/inventory/hosts.ini
 *.retry
+ansible/vars/secrets.yml

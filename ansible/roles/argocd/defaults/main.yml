@@ -1,1 +1,7 @@
 argocd_namespace: argocd
+argocd_app_name: barq
+argocd_repo_url: https://github.com/MohamedHamdy120/BARQ-final-project
+argocd_target_revision: kubernetes
+argocd_app_path: kubernetes
+argocd_app_namespace: barq
+argocd_create_app: true

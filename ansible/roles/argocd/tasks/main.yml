@@ -29,3 +29,42 @@
 - name: Wait until the Argo CD application controller is rolled out
   ansible.builtin.command: kubectl -n {{ argocd_namespace }} rollout status statefulset/argocd-application-controller --timeout=300s
   changed_when: false
+
+- name: Load the encrypted application secrets
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/vars/secrets.yml"
+  no_log: true
+  when: argocd_create_app | bool
+
+- name: Create the application namespace
+  ansible.builtin.shell: >
+    kubectl create namespace {{ argocd_app_namespace }}
+    --dry-run=client -o yaml | kubectl apply -f -
+  register: app_ns
+  changed_when: "'created' in app_ns.stdout"
+  when: argocd_create_app | bool
+
+- name: Create the flask-db Secret
+  ansible.builtin.shell: >
+    kubectl -n {{ argocd_app_namespace }} create secret generic flask-db
+    --from-literal=DATABASE_URL="$DB_URL"
+    --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    DB_URL: "{{ flask_database_url }}"
+  register: flask_secret
+  changed_when: "'created' in flask_secret.stdout or 'configured' in flask_secret.stdout"
+  no_log: true
+  when: argocd_create_app | bool
+
+- name: Render the Argo CD Application manifest
+  ansible.builtin.template:
+    src: application.yaml.j2
+    dest: /root/argocd-application.yaml
+    mode: "0644"
+  when: argocd_create_app | bool
+
+- name: Apply the Argo CD Application
+  ansible.builtin.command: kubectl apply -f /root/argocd-application.yaml
+  register: argocd_app_apply
+  changed_when: "'created' in argocd_app_apply.stdout or 'configured' in argocd_app_apply.stdout"
+  when: argocd_create_app | bool
