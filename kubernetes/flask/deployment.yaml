@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: flask
-          image: ghcr.io/mohamedhamdy120/barq-flask@sha256:ce129aa5d071536944bc67b6735d8b48de93c9ca5f3425935044f97709cc8a19
+          image: ghcr.io/mohamedhamdy120/barq-flask@sha256:9db2392a8a384bb8efe5acc5f5da6d2a279275d13bd4916abf86e533c696734b
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
