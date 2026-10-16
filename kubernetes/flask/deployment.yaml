@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: flask
-          image: barq-flask:local-v4
+          image: ghcr.io/mohamedhamdy120/barq-flask@sha256:26ad46194335d5e115fbcd182663d5a7d5cdb813825281be17dcd11f7cb1322f
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
