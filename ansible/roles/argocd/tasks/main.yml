@@ -1,0 +1,31 @@
+- name: Check whether Argo CD is already installed
+  ansible.builtin.command: kubectl -n {{ argocd_namespace }} get deployment argocd-server
+  register: argocd_check
+  changed_when: false
+  failed_when: false
+
+- name: Create the Argo CD namespace
+  ansible.builtin.shell: >
+    kubectl create namespace {{ argocd_namespace }}
+    --dry-run=client -o yaml | kubectl apply -f -
+  register: argocd_ns
+  changed_when: "'created' in argocd_ns.stdout"
+
+- name: Install Argo CD {{ argocd_version }}
+  ansible.builtin.command: >
+    kubectl apply -n {{ argocd_namespace }} --server-side --force-conflicts
+    -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml
+  when: argocd_check.rc != 0
+
+- name: Wait until the Argo CD deployments are rolled out
+  ansible.builtin.command: kubectl -n {{ argocd_namespace }} rollout status deployment/{{ item }} --timeout=300s
+  loop:
+    - argocd-server
+    - argocd-repo-server
+    - argocd-redis
+    - argocd-applicationset-controller
+  changed_when: false
+
+- name: Wait until the Argo CD application controller is rolled out
+  ansible.builtin.command: kubectl -n {{ argocd_namespace }} rollout status statefulset/argocd-application-controller --timeout=300s
+  changed_when: false

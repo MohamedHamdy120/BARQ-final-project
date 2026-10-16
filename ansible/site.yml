@@ -18,3 +18,11 @@
     KUBECONFIG: /etc/kubernetes/admin.conf
   roles:
     - addons
+
+- name: Install Argo CD
+  hosts: control_plane
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  roles:
+    - role: argocd
+      tags: argocd
