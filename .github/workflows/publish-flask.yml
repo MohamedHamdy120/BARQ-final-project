@@ -1,0 +1,67 @@
+name: Publish BARQ Flask Image
+
+on:
+  push:
+    branches:
+      - kubernetes
+    paths:
+      - "Dockerfile"
+      - ".dockerignore"
+      - "requirements.txt"
+      - "app/**"
+      - ".github/workflows/publish-flask.yml"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish Flask image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/mohamedhamdy120/barq-flask:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+      - name: Write the new image digest into the Flask manifest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          sed -i -E "s|(image: ghcr.io/mohamedhamdy120/barq-flask)@sha256:[a-f0-9]{64}|\1@${DIGEST}|" kubernetes/flask/deployment.yaml
+          grep "image: ghcr.io" kubernetes/flask/deployment.yaml
+
+      - name: Commit the new digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          if git diff --quiet; then
+            echo "Manifest already up to date, nothing to commit"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add kubernetes/flask/deployment.yaml
+          git commit -m "ci: deploy barq-flask ${DIGEST}"
+          git push
