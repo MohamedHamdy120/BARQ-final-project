@@ -4,3 +4,34 @@ outputs.json
 ansible/inventory/hosts.ini
 *.retry
 ansible/vars/secrets.yml
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*secret*.yaml
+*secret*.yml
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Mac
+.DS_Store
+
+# Temporary archives
+*.bundle
