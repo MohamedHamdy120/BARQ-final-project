@@ -5,7 +5,7 @@ metadata:
   name: nginx
   namespace: barq
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: nginx
