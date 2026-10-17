@@ -50,3 +50,27 @@
         msg:
           - "{{ nodes.stdout_lines }}"
           - "{{ pods.stdout_lines }}"
+
+- name: Verify Argo CD and the application
+  hosts: control_plane
+  gather_facts: false
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  tasks:
+    - name: Wait for all Argo CD pods to be Ready
+      ansible.builtin.command: kubectl wait --for=condition=Ready pods --all -n argocd --timeout=120s
+      changed_when: false
+
+    - name: Get the barq Application sync and health status
+      ansible.builtin.command: >
+        kubectl get application barq -n argocd
+        -o jsonpath='{.status.sync.status} {.status.health.status}'
+      register: app_status
+      changed_when: false
+
+    - name: Assert the Application is Synced and Healthy
+      ansible.builtin.assert:
+        that:
+          - app_status.stdout == "Synced Healthy"
+        success_msg: "barq Application: {{ app_status.stdout }}"
+        fail_msg: "barq Application is not ready: {{ app_status.stdout }}"
