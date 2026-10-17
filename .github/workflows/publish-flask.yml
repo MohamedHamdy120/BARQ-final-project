@@ -3,7 +3,7 @@ name: Publish BARQ Flask Image
 on:
   push:
     branches:
-      - kubernetes
+      - main
     paths:
       - "Dockerfile"
       - ".dockerignore"
