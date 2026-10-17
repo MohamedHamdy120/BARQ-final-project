@@ -1,0 +1,86 @@
+---
+- name: Confirm cluster reset
+  hosts: control_plane
+  gather_facts: false
+  vars_prompt:
+    - name: confirm
+      prompt: "This DESTROYS the Kubernetes cluster and app data. Type 'yes' to continue"
+      private: false
+  tasks:
+    - name: Stop unless confirmed
+      ansible.builtin.fail:
+        msg: "Reset cancelled."
+      when: confirm != 'yes'
+
+- name: Clean up cluster resources before reset
+  hosts: control_plane
+  gather_facts: false
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  vars:
+    app_namespaces: [barq]
+  tasks:
+    - name: Check if a cluster exists
+      ansible.builtin.stat:
+        path: /etc/kubernetes/admin.conf
+      register: admin_conf
+
+    - name: Cleanup steps (only if the cluster exists)
+      when: admin_conf.stat.exists
+      block:
+        - name: Delete Argo CD Applications so they don't recreate the app
+          ansible.builtin.command: kubectl delete applications.argoproj.io --all -n argocd --ignore-not-found
+          register: argo_del
+          changed_when: "'deleted' in argo_del.stdout"
+          failed_when: false
+
+        - name: Delete application namespaces (releases their PVCs)
+          ansible.builtin.command: "kubectl delete namespace {{ item }} --ignore-not-found --timeout=300s"
+          loop: "{{ app_namespaces }}"
+          register: ns_del
+          changed_when: "'deleted' in ns_del.stdout"
+
+        - name: Delete any remaining PVCs
+          ansible.builtin.command: kubectl delete pvc --all -A --timeout=300s
+          register: pvc_del
+          changed_when: "'deleted' in pvc_del.stdout"
+
+        - name: Wait until dynamically provisioned volumes (EBS) are deleted
+          ansible.builtin.shell: >
+            kubectl get pv -o jsonpath='{range .items[?(@.spec.persistentVolumeReclaimPolicy=="Delete")]}{.metadata.name}{"\n"}{end}'
+          register: pv_left
+          until: pv_left.stdout | trim == ''
+          retries: 30
+          delay: 10
+          changed_when: false
+
+- name: Reset Kubernetes on all nodes
+  hosts: k8s
+  tasks:
+    - name: kubeadm reset
+      ansible.builtin.command: kubeadm reset -f
+      args:
+        removes: /etc/kubernetes/kubelet.conf
+
+    - name: Remove Flannel state, CNI state and kubeconfigs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /run/flannel
+        - /var/lib/cni
+        - /root/.kube
+        - "/home/{{ ansible_user }}/.kube"
+
+    - name: Remove CNI network configs (containerd keeps the folder itself)
+      ansible.builtin.shell: find /etc/cni/net.d -mindepth 1 -print -delete
+      register: cni_conf
+      changed_when: cni_conf.stdout | length > 0
+      failed_when: false
+
+    - name: Remove leftover Flannel interfaces
+      ansible.builtin.command: "ip link delete {{ item }}"
+      loop: [cni0, flannel.1]
+      register: link_del
+      changed_when: link_del.rc == 0
+      failed_when: false
