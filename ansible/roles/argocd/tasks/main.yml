@@ -44,17 +44,49 @@
   changed_when: "'created' in app_ns.stdout"
   when: argocd_create_app | bool
 
-- name: Create the flask-db Secret
+- name: Read the current flask-db Secret value
+  ansible.builtin.command: >
+    kubectl -n {{ argocd_app_namespace }} get secret flask-db
+    -o jsonpath={.data.DATABASE_URL}
+  register: current_db_url
+  changed_when: false
+  failed_when: false
+  no_log: true
+  when: argocd_create_app | bool
+
+- name: Create or update the flask-db Secret
   ansible.builtin.shell: >
     kubectl -n {{ argocd_app_namespace }} create secret generic flask-db
     --from-literal=DATABASE_URL="$DB_URL"
     --dry-run=client -o yaml | kubectl apply -f -
   environment:
     DB_URL: "{{ flask_database_url }}"
-  register: flask_secret
-  changed_when: "'created' in flask_secret.stdout or 'configured' in flask_secret.stdout"
+  no_log: true
+  when:
+    - argocd_create_app | bool
+    - (current_db_url.stdout | default('') | b64decode) != flask_database_url
+
+- name: Read the current flask-redis Secret value
+  ansible.builtin.command: >
+    kubectl -n {{ argocd_app_namespace }} get secret flask-redis
+    -o jsonpath={.data.REDIS_URL}
+  register: current_redis_url
+  changed_when: false
+  failed_when: false
   no_log: true
   when: argocd_create_app | bool
+
+- name: Create or update the flask-redis Secret
+  ansible.builtin.shell: >
+    kubectl -n {{ argocd_app_namespace }} create secret generic flask-redis
+    --from-literal=REDIS_URL="$REDIS_URL"
+    --dry-run=client -o yaml | kubectl apply -f -
+  environment:
+    REDIS_URL: "{{ flask_redis_url }}"
+  no_log: true
+  when:
+    - argocd_create_app | bool
+    - (current_redis_url.stdout | default('') | b64decode) != flask_redis_url
 
 - name: Render the Argo CD Application manifest
   ansible.builtin.template:
