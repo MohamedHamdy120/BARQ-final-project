@@ -82,3 +82,24 @@ variable "db_instance_class" {
   type    = string
   default = "db.t3.micro"
 }
+
+variable "enable_elasticache" {
+  type    = bool
+  default = false
+}
+
+variable "cache_node_type" {
+  type    = string
+  default = "cache.t4g.micro"
+}
+
+variable "cache_auth_token" {
+  type      = string
+  sensitive = true
+  default   = null
+
+  validation {
+    condition     = var.cache_auth_token == null ? true : can(regex("^[^@\"/ ]{16,128}$", var.cache_auth_token))
+    error_message = "Use 16 to 128 characters, without @, double quotes, / or spaces."
+  }
+}
